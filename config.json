@@ -1,0 +1,8 @@
+{
+    "package_name": "example-package",
+    "repo_url_or_path": "https://example.com/repo",
+    "repo_mode": "url",
+    "graph_file_name": "graph.png",
+    "ascii_tree_mode": true,
+    "filter_substring": "filter-me"
+}
