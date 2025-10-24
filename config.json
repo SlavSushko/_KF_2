@@ -1,8 +1,8 @@
 {
-    "package_name": "example-package",
-    "repo_url_or_path": "https://example.com/repo",
+    "package_name": "curl",
+    "repo_url_or_path": "http://archive.ubuntu.com/ubuntu/dists/jammy/main/binary-amd64/Packages.gz",
     "repo_mode": "url",
     "graph_file_name": "graph.png",
     "ascii_tree_mode": true,
-    "filter_substring": "filter-me"
+    "filter_substring": ""
 }

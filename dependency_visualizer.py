@@ -2,10 +2,83 @@ import json
 import sys
 import argparse
 import os
+import urllib.request
+import gzip
+import re
+
+
+def get_packages_data(url_or_path, mode):
+    try:
+        if mode.lower() == 'url':
+            with urllib.request.urlopen(url_or_path) as response:
+                data = response.read()
+        elif mode.lower() == 'file':
+            with open(url_or_path, 'rb') as f:
+                data = f.read()
+        else:
+            raise ValueError("Invalid repo_mode.")
+
+        if url_or_path.lower().endswith('.gz'):
+            data = gzip.decompress(data)
+
+        return data.decode('utf-8')
+    except urllib.error.URLError as e:
+        print(f"Error: Failed to download from URL: {str(e)}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Error: File '{url_or_path}' not found.")
+        sys.exit(1)
+    except gzip.BadGzipFile:
+        print("Error: Invalid gzip file.")
+        sys.exit(1)
+    except UnicodeDecodeError:
+        print("Error: Failed to decode file content as UTF-8.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Unexpected error while fetching data: {str(e)}")
+        sys.exit(1)
+
+
+def parse_packages(text):
+    packages = {}
+    current = {}
+    for line in text.splitlines():
+        if not line.strip():
+            if current:
+                pkg = current.get('Package')
+                if pkg:
+                    packages[pkg] = current
+                current = {}
+            continue
+        if ':' in line:
+            key, value = line.split(':', 1)
+            current[key.strip()] = value.strip()
+    if current:
+        pkg = current.get('Package')
+        if pkg:
+            packages[pkg] = current
+    return packages
+
+
+def parse_depends(depends_str):
+    if not depends_str:
+        return []
+    deps = []
+    for part in depends_str.split(','):
+        part = part.strip()
+        alts = [alt.strip() for alt in part.split('|')]
+        for alt in alts:
+            match = re.match(r'([\w\-+.]+)', alt)
+            if match:
+                deps.append(match.group(1))
+    return sorted(set(deps))
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Minimal CLI prototype for dependency graph visualization tool.")
-    parser.add_argument('--config', default='config.json', help='Path to the JSON configuration file (default: config.json)')
+    parser = argparse.ArgumentParser(
+        description="Dependency graph visualization tool - Stage 2: Fetch and display direct dependencies.")
+    parser.add_argument('--config', default='config.json',
+                        help='Path to the JSON configuration file (default: config.json)')
     args = parser.parse_args()
 
     if not os.path.exists(args.config):
@@ -66,10 +139,25 @@ def main():
             print(f" - {error}")
         sys.exit(1)
 
-    print("User-configurable parameters:")
-    for key in required_params:
-        value = config[key]
-        print(f"{key}: {value}")
+    packages_text = get_packages_data(config['repo_url_or_path'], config['repo_mode'])
+
+    packages = parse_packages(packages_text)
+
+    if config['package_name'] not in packages:
+        print(f"Error: Package '{config['package_name']}' not found in the repository.")
+        sys.exit(1)
+
+    depends_str = packages[config['package_name']].get('Depends', '')
+
+    direct_deps = parse_depends(depends_str)
+
+    print(f"Direct dependencies of '{config['package_name']}':")
+    if direct_deps:
+        for dep in direct_deps:
+            print(dep)
+    else:
+        print("No direct dependencies found.")
+
 
 if __name__ == "__main__":
     main()
